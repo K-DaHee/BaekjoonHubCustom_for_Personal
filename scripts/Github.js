@@ -41,6 +41,23 @@ class GitHub {
     return updateHead(this.hook, this.token, ref, commitSHA, true);
   }
 
+  // ==================== [START] 추가할 코드 ====================
+  async createReference(ref, sha) {
+    log('GitHub createReference', 'ref:', ref, 'sha:', sha);
+    return createReference(this.hook, this.token, ref, sha);
+  }
+
+  async createPullRequest(title, body, head, base) {
+    log('GitHub createPullRequest', 'title:', title, 'head:', head, 'base:', base);
+    return createPullRequest(this.hook, this.token, title, body, head, base);
+  }
+
+  async getCommit(sha) {
+    log('GitHub getCommit', 'sha:', sha);
+    return getCommit(this.hook, this.token, sha);
+  }
+  // ===================== [END] 추가할 코드 =====================
+
   async getTree() {
     // hook, token
     return getTree(this.hook, this.token);
@@ -180,4 +197,67 @@ async function getTree(hook, token) {
     .then((data) => {
       return data.tree;
     });
+}
+
+/**
+ * create a reference
+ * @see https://docs.github.com/en/rest/git/refs#create-a-reference
+ * @param {string} hook - github repository
+ * @param {string} token - github token
+ * @param {string} ref - the reference name (e.g., "refs/heads/branch_name")
+ * @param {string} sha - the SHA1 value for this reference
+ * @return {Promise} - the promise for the reference object
+ */
+async function createReference(hook, token, ref, sha) {
+  return fetch(`https://api.github.com/repos/${hook}/git/refs`, {
+    method: 'POST',
+    body: JSON.stringify({ ref, sha }),
+    headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json', 'content-type': 'application/json' },
+  }).then((res) => res.json());
+}
+
+/**
+ * create a pull request
+ * @see https://docs.github.com/en/rest/pulls/pulls#create-a-pull-request
+ * @param {string} hook - github repository
+ * @param {string} token - github token
+ * @param {string} title - the title of the pull request
+ * @param {string} body - the contents of the pull request
+ * @param {string} head - the name of the branch where your changes are implemented
+ * @param {string} base - the name of the branch you want the changes pulled into
+ * @return {Promise} - the promise for the pull request object
+ */
+async function createPullRequest(hook, token, title, body, head, base) {
+  return fetch(`https://api.github.com/repos/${hook}/pulls`, {
+    method: 'POST',
+    body: JSON.stringify({ title, head, base, body }),
+    headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json', 'content-type': 'application/json' },
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      // PR 생성 실패 시 에러를 더 명확하게 보여줍니다.
+      if (data.errors) {
+        throw new Error(`PR 생성 실패: ${JSON.stringify(data.errors)}`);
+      }
+      return data;
+    });
+}
+
+/**
+ * get a commit
+ * @see https://docs.github.com/en/rest/git/commits#get-a-commit-object
+ * @param {string} hook - the github repository
+ * @param {string} token - the github token
+ * @param {string} commit_sha - the commit sha
+ * @return {Promise} - the promise for the commit object
+ */
+async function getCommit(hook, token, commit_sha) {
+  return fetch(`https://api.github.com/repos/${hook}/git/commits/${commit_sha}`, {
+    method: 'GET',
+    headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' },
+  })
+  .then((res) => res.json())
+  .then((data) => {
+    return { treeSHA: data.tree.sha };
+  });
 }

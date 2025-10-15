@@ -45,36 +45,85 @@ async function makeDetailMessageAndReadme(data) {
     problem_description, problem_input, problem_output, submissionTime,
     code, language, memory, runtime } = data;
   const score = parseNumberFromString(result);
+  // level 변수(예: "Bronze II")를 분리
+  const levelParts = level.split(' ');
+  const tier = levelParts[0].toLowerCase(); // "bronze"
+  const rankStr = levelParts[1]; // "II"
+
+  // 로마 숫자나 아라비아 숫자를 두 자리 숫자로 변환 (예: "II" -> "02")
+  const romanMap = { 'V': 5, 'IV': 4, 'III': 3, 'II': 2, 'I': 1 };
+  const rankNum = romanMap[rankStr] || parseInt(rankStr, 10);
+  const formattedRank = String(rankNum).padStart(2, '0'); // "02", "05" 등
+  const tierWithRank = `${tier}${formattedRank}`;
+
+  // 최종 디렉토리 경로 조합
   const directory = await getDirNameByOrgOption(
-    `백준/${level.replace(/ .*/, '')}/${problemId}. ${convertSingleCharToDoubleChar(title)}`,
+    `Baekjoon/src/BOJ/${tier}/${tierWithRank}`,
     langVersionRemove(language, null)
   );
-  const message = `[${level}] Title: ${title}, Time: ${runtime} ms, Memory: ${memory} KB`
-    + ((isNaN(score)) ? ' ' : `, Score: ${score} point `) // 서브 태스크가 있는 문제로, 점수가 있는 경우 점수까지 커밋 메시지에 표기
-    + `-BaekjoonHub`;
+  
+  // Commit Message [월/BOJ] 문제번호 문제이름
+  const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  const currentMonth = months[new Date().getMonth()];
+  const message = `[${currentMonth}/BOJ] ${problemId} ${title}`;
+
   const category = problem_tags.join(', ');
-  const fileName = `${convertSingleCharToDoubleChar(title)}.${languages[language]}`;
+  const fileName = `BOJ_${problemId}.${languages[language]}`;
   const dateInfo = submissionTime ?? getDateString(new Date(Date.now()));
-  // prettier-ignore-start
-  const readme = `# [${level}] ${title} - ${problemId} \n\n`
-    + `[문제 링크](https://www.acmicpc.net/problem/${problemId}) \n\n`
-    + `### 성능 요약\n\n`
-    + `메모리: ${memory} KB, `
-    + `시간: ${runtime} ms\n\n`
-    + `### 분류\n\n`
-    + `${category || "Empty"}\n\n` + (!!problem_description ? ''
-    + `### 제출 일자\n\n`
-    + `${dateInfo}\n\n`
-      + `### 문제 설명\n\n${problem_description}\n\n`
-      + `### 입력 \n\n ${problem_input}\n\n`
-      + `### 출력 \n\n ${problem_output}\n\n` : '');
-  // prettier-ignore-end
+  
+  const clean_input = problem_input.replace(/<[^>]*>?/gm, '').trim();
+  const clean_output = problem_output.replace(/<[^>]*>?/gm, '').trim();
+
+  const prBody = `
+  # 🧩 알고리즘 문제 풀이
+  ## 📝 문제 정보
+  - **플랫폼:** 백준 (BOJ)
+  - **문제 이름:** ${problemId} ${title}
+  - **문제 링크:** https://www.acmicpc.net/problem/${problemId}
+  - **난이도:** ${level}
+  - **알고리즘 유형:** ${category || "분류 정보 없음"}
+  - **제출 일자:** ${dateInfo}
+
+  ## 💡 문제 설명
+  ${problem_description}
+
+  ### 입력
+  ${clean_input}
+
+  ### 출력
+  ${clean_output}
+
+  ## ⏱️ 성능 요약
+  ### 메모리
+  ${memory} KB
+  ### 시간
+  ${runtime} ms
+
+  > 출처: Baekjoon Online Judge, https://www.acmicpc.net/problemset
+  `;
+
+  let modifiedCode = code;
+
+  // Java 파일일 경우, 파일명에 맞춰 클래스명 변경
+  const extension = languages[language];
+  if (extension === 'java') {
+    const newClassName = `BOJ_${problemId}`;
+    modifiedCode = code.replace(/public\s+class\s+([A-Za-z_][A-Za-z0-9_]*)/, `public class ${newClassName}`);
+  }
+
+  // 패키지 선언문 추가
+  let finalCode = modifiedCode;
+  if (extension === 'java') {
+    const packageName = `package BOJ.${tier}.${tierWithRank};`;
+    finalCode = `${packageName}\n\n${modifiedCode}`;
+  }
+
   return {
     directory,
     fileName,
     message,
-    readme,
-    code
+    prBody,
+    code: finalCode
   };
 }
 
