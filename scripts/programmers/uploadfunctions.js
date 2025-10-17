@@ -1,12 +1,12 @@
-/**
- * Github에 풀 리퀘스트 생성하여 문제 풀이 코드 업로드
- * @param {object} bojData - 문제 풀이와 관련된 데이터 객체
- * @param {string} bojData.code - 소스 코드
- * @param {string} bojData.directory - 파일이 저장될 Git 저장소 내의 경로
- * @param {string} bojData.fileName - 파일명
- * @param {string} bojData.message - 커밋 메시지
- * @param {string} bojData.prBody - Pull Request 본문에 들어갈 내용
- * @param {function} cb - 업로드 완료 후 실행될 콜백 함수
+/** 푼 문제들에 대한 단일 업로드는 uploadGit 함수로 합니다.
+ * 파라미터는 아래와 같습니다.
+ * @param {string} filePath - 업로드할 파일의 경로
+ * @param {string} sourceCode - 업로드하는 소스코드 내용
+ * @param {string} readme - 업로드하는 README 내용
+ * @param {string} filename - 업로드할 파일명
+ * @param {string} commitMessage - 커밋 메시지
+ * @param {function} cb - 콜백 함수 (ex. 업로드 후 로딩 아이콘 처리 등)
+ * @returns {Promise<void>}
  */
 async function uploadOneSolveProblemOnGit(bojData, cb) {
   const token = await getToken();
@@ -15,76 +15,42 @@ async function uploadOneSolveProblemOnGit(bojData, cb) {
     console.error('token or hook is null', token, hook);
     return;
   }
-  
-  // 새로운 브랜치 생성
-  const { newBranchName } = await createBranchAndCommit(hook, token, bojData.code, bojData.directory, bojData.fileName, bojData.message);
-    
-  if (newBranchName) {
-    // 생성된 브랜치 기반으로 PR 생성
-    const pullRequest = await createPullRequestFromBranch(hook, token, bojData.prBody, bojData.message, newBranchName);
-    console.log(`Pull Request가 성공적으로 생성되었습니다: ${pullRequest.html_url}`);
-    
-    if (typeof cb === 'function') {
-      cb(pullRequest.html_url);
-    }
-  }
+  return upload(token, hook, bojData.code, bojData.readme, bojData.directory, bojData.fileName, bojData.message, cb);
 }
 
-/**
- * Github api를 사용하여 업로드
- * @see https://docs.github.com/en/rest/reference/repos#create-or-update-file-contents
- * @param {string} token - github api 토큰
- * @param {string} hook - github api hook
- * @param {string} sourceText - 업로드할 소스코드 내용
- * @param {string} readmeText - 업로드할 README 내용
- * @param {string} directory - 업로드될 파일의 경로
- * @param {string} filename - 업로드할 파일명
- * @param {string} commitMessage - 커밋 메시지 (예: "[OCT/플랫폼] 1000 Helloworld")
- * @param {function} cb - 콜백 함수 (ex. 업로드 후 로딩 아이콘 처리 등)
- */
-async function createBranchAndCommit(hook, token, sourceText, directory, filename, commitMessage) {
-  const git = new GitHub(hook, token);
-  const stats = await getStats();
-  let baseBranch = stats.branches[hook] || await git.getDefaultBranchOnRepo();
-  stats.branches[hook] = baseBranch;
-  
-  // 베이스 브랜치의 최신 '커밋' SHA와 '트리' SHA 가져옴
-  const { refSHA: baseBranchSHA } = await git.getReference(baseBranch);
-  const { treeSHA: baseTreeSHA } = await git.getCommit(baseBranchSHA);
-
-  // 커밋 메시지에서 플랫폼 정보 추출
-  const platform = commitMessage.substring(commitMessage.indexOf('/') + 1, commitMessage.indexOf(']'));
-  
-  // 새 브랜치 생성
-  const newBranchName = `${platform}/problem-${filename.replace(/[^0-9]/g, '')}`;
-  const newBranchRef = `refs/heads/${newBranchName}`;
-  await git.createReference(newBranchRef, baseBranchSHA);
-
-  // 파일 Blob 생성 및 새 Tree 생성
-  const source = await git.createBlob(sourceText, `${directory}/${filename}`);
-  const newTreeSHA = await git.createTree(baseTreeSHA, [source]);
-
-  // 새 커밋 생성 및 브랜치 Head 업데이트
-  const commitSHA = await git.createCommit(commitMessage, newTreeSHA, baseBranchSHA);
-  await git.updateHead(newBranchRef, commitSHA);
-
-  console.log(`성공: '${newBranchName}' 브랜치에 커밋이 완료되었습니다.`);
-  return { newBranchName };
-}
-
-/**
- * 브랜치 기반으로 Pull Request 생성
- * @param {string} newBranchName - PR을 보낼 브랜치 이름 (e.g., "플랫폼/problem-1001")
- * @returns {Promise<object>} 생성된 Pull Request 객체
+/** Github api를 사용하여 업로드를 합니다.
+ * @see https://docs.github.com/en/rest/reference/repos#create-or-update-file-contents
+ * @param {string} token - github api 토큰
+ * @param {string} hook - github api hook
+ * @param {string} sourceText - 업로드할 소스코드
+ * @param {string} readmeText - 업로드할 readme
+ * @param {string} directory - 업로드할 파일의 경로
+ * @param {string} filename - 업로드할 파일명
+ * @param {string} commitMessage - 커밋 메시지
+ * @param {function} cb - 콜백 함수 (ex. 업로드 후 로딩 아이콘 처리 등)
  */
-async function createPullRequestFromBranch(hook, token, prBody, commitMessage, newBranchName) {
+async function upload(token, hook, sourceText, readmeText, directory, filename, commitMessage, cb) {
+  /* 업로드 후 커밋 */
   const git = new GitHub(hook, token);
   const stats = await getStats();
-  const baseBranch = stats.branches[hook];
+  let default_branch = stats.branches[hook];
+  if (isNull(default_branch)) {
+    default_branch = await git.getDefaultBranchOnRepo();
+    stats.branches[hook] = default_branch;
+  }
+  const { refSHA, ref } = await git.getReference(default_branch);
+  const source = await git.createBlob(sourceText, `${directory}/${filename}`); // 소스코드 파일
+  const readme = await git.createBlob(readmeText, `${directory}/README.md`); // readme 파일
+  const treeSHA = await git.createTree(refSHA, [source, readme]);
+  const commitSHA = await git.createCommit(commitMessage, treeSHA, refSHA);
+  await git.updateHead(ref, commitSHA);
 
-  // PR 제목 생성 => 커밋 메세지를 이미 수정해뒀기 때문에 동일하게 지정
-  const prTitle = commitMessage;
-
-  // PR 생성 API 호출
-  return git.createPullRequest(prTitle, prBody, newBranchName, baseBranch);
+  /* stats의 값을 갱신합니다. */
+  updateObjectDatafromPath(stats.submission, `${hook}/${source.path}`, source.sha);
+  updateObjectDatafromPath(stats.submission, `${hook}/${readme.path}`, readme.sha);
+  await saveStats(stats);
+  // 콜백 함수 실행
+  if (typeof cb === 'function') {
+    cb(stats.branches, directory);
+  }
 }

@@ -58,16 +58,6 @@ async function beginUpload(bojData) {
   log('bojData', bojData);
   startUpload();
   if (isNotEmpty(bojData)) {
-    // 프롬프트로 사용자에게 직접 알고리즘 유형 입력받기
-    const userDefinedTags = prompt("이 문제의 알고리즘 분류를 입력하세요.\n(예: DFS, DP, 구현)", "");
-    if (userDefinedTags) {
-      // prBody 알고리즘 유형을 입력 받은 값으로 교체
-      bojData.prBody = bojData.prBody.replace('#알고리즘유형#', userDefinedTags);
-    } else {
-      // 사용자가 입력 취소하면 기본값으로 변경
-      bojData.prBody = bojData.prBody.replace('#알고리즘유형#', '직접 작성하세요');
-    }
-
     const stats = await getStats();
     const hook = await getHook();
 
