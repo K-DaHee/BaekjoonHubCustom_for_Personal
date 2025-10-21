@@ -70,9 +70,9 @@ async function makeData(origin) {
 
   ## ⏱️ 성능 요약
   ### 메모리
-  ${memory} KB
+  ${memory}
   ### 시간
-  ${runtime} ms
+  ${runtime}
 
   > 출처: 프로그래머스 코딩 테스트 연습, https://school.programmers.co.kr/learn/challenges
   `;

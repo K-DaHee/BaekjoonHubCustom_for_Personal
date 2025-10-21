@@ -95,9 +95,9 @@ async function makeDetailMessageAndReadme(data) {
 
   ## ⏱️ 성능 요약
   ### 메모리
-  ${memory} KB
+  ${memory}
   ### 시간
-  ${runtime} ms
+  ${runtime}
 
   > 출처: Baekjoon Online Judge, https://www.acmicpc.net/problemset
   `;
