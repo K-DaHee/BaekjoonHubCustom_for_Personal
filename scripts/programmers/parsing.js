@@ -70,9 +70,9 @@ async function makeData(origin) {
 
   ## ⏱️ 성능 요약
   ### 메모리
-  ${memory} KB
+  ${memory}
   ### 시간
-  ${runtime} ms
+  ${runtime}
 
   ## 🤔 접근 방법
   #접근방법#
