@@ -40,18 +40,21 @@ function makeSubmitButton(link) {
  * 1. 업로드 완료 아이콘을 표시합니다.
  * 2. 아이콘 클릭 시 업로드된 GitHub 링크로 이동하는 이벤트 리스너를 등록합니다.
  */
-function markUploadedCSS(branches, directory) {
+function markUploadedCSS(uploadedUrl) {
   uploadState.uploading = false;
   const elem = document.getElementById('BaekjoonHub_progress_elem');
   elem.className = 'markuploaded';
+  /*
   const uploadedUrl = "https://github.com/" +
               Object.keys(branches)[0] + "/tree/" + 
               branches[Object.keys(branches)[0]] + "/" + directory;
+  */
   elem.addEventListener("click", function() {
     window.location.href = uploadedUrl;
   });
   elem.style.cursor = "pointer";
 }
+
 
 /**
  * 업로드 실패 아이콘 표시
