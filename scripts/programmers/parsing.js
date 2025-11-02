@@ -98,12 +98,21 @@ async function makeData(origin) {
 
   // Java 파일일 경우, 실행 가능한 main 클래스를 생성하고 기존 Solution 클래스를 래핑합니다.
   if (language_extension === 'java') {
-    const solutionClassName = `Solution_${problemId}`; // 내부 풀이 클래스 이름
-    const mainClassName = `PRO_${problemId}`;       // 실행용 public 클래스 이름 (파일명과 동일)
+    const solutionClassName = `Solution_${problemId}`;
+    const mainClassName = `PRO_${problemId}`;
+    
+    // import 구문들을 모두 찾기
+    const importRegex = /import\s+.*?;/g;
+    const importMatches = code.match(importRegex);
+    // 찾은 import 구문들을 줄바꿈으로 합치기. 없으면 빈 문자열.
+    const importBlock = importMatches ? importMatches.join('\n') : '';
 
-    // 기존 코드의 'class Solution'을 'class Solution_문제번호'로 변경
-    const modifiedSolutionClass = code.replace(/(public\s*)?class\s*Solution/, `class ${solutionClassName}`);
+    // 원본 코드에서 import 구문들을 제거
+    const codeWithoutImports = code.replace(importRegex, '').trim();
 
+    // import가 제거된 코드에서 class 이름 변경
+    const modifiedSolutionClass = codeWithoutImports.replace(/(public\s*)?class\s*Solution/, `class ${solutionClassName}`);
+    
     // main 메서드를 포함하는 새로운 public 클래스 생성
     const mainClass = `
 public class ${mainClassName} {
@@ -117,8 +126,9 @@ public class ${mainClassName} {
     // 패키지 선언문
     const packageName = `package PRO.Lv${level};`;
 
-    // 최종 코드를 조합: 패키지 선언부 + 실행용 클래스 + 풀이 클래스
-    finalCode = `${packageName}\n\n${mainClass}\n\n${modifiedSolutionClass}`;
+    // 최종 코드 조합
+    // 패키지 -> import -> 실행용 클래스 -> 풀이 클래스
+    finalCode = `${packageName}\n\n${importBlock}\n\n${mainClass}\n\n${modifiedSolutionClass}`;
   }
 
   return { 
