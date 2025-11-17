@@ -55,7 +55,7 @@ async function makeData(origin) {
   const fileName = `PRO_${problemId}.${language_extension}`;
   const dateInfo = getDateString(new Date(Date.now()));
 
-  const clean_description = problem_description.replace(/<[^>]*>?/gm, '');
+  const clean_description = convertHtmlToMarkdown(problem_description);
 
   const prBody = `
   # 🧩 알고리즘 문제 풀이
@@ -128,7 +128,7 @@ public class ${mainClassName} {
 
     // 최종 코드 조합
     // 패키지 -> import -> 실행용 클래스 -> 풀이 클래스
-    finalCode = `${packageName}\n\n${importBlock}\n\n${mainClass}\n\n${modifiedSolutionClass}`;
+    finalCode = `${packageName}\n${importBlock}\n${mainClass}\n${modifiedSolutionClass}`;
   }
 
   return { 
@@ -139,4 +139,59 @@ public class ${mainClassName} {
     prBody, 
     code: finalCode 
   };
+}
+
+// HTML을 마크다운으로 변환하는 헬퍼 함수
+function convertHtmlToMarkdown(htmlText) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlText, 'text/html');
+
+  // 테이블 변환
+  const tables = doc.querySelectorAll('table');
+  tables.forEach(table => {
+      let mdTable = '\n';
+      
+      // 헤더 처리
+      const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
+      if (headers.length > 0) {
+          mdTable += `| ${headers.join(' | ')} |\n`;
+          mdTable += `| ${headers.map(() => '---').join(' | ')} |\n`;
+      }
+
+      // 본문 처리
+      const rows = table.querySelectorAll('tbody tr');
+      rows.forEach(row => {
+          const cells = Array.from(row.querySelectorAll('td')).map(td => td.textContent.trim());
+          mdTable += `| ${cells.join(' | ')} |\n`;
+      });
+      
+      mdTable += '\n';
+
+      // 테이블 태그를 마크다운 텍스트 노드로 교체
+      const textNode = document.createTextNode(mdTable);
+      table.parentNode.replaceChild(textNode, table);
+  });
+
+  // 나머지 태그 정규식 변환
+  let content = doc.body.innerHTML;
+
+  content = content
+      // <h5> => Bold
+      .replace(/<h5>(.*?)<\/h5>/gi, '**$1**')
+      // <ul> => 삭제 (내부 li는 처리됨)
+      .replace(/<\/?ul[^>]*>/gi, '')
+      // <li> => - 
+      .replace(/<li[^>]*>/gi, '- ')
+      .replace(/<\/li>/gi, '') 
+      // <br> => 줄바꿈
+      .replace(/<br\s*\/?>/gi, '\n')
+      // <p> => 삭제
+      .replace(/<\/?p[^>]*>/gi, '')
+      // 나머지 태그 삭제 (span, div, img 등 정리)
+      .replace(/<[^>]*>?/gm, '')
+      // 공백 정리
+      .replace(/&nbsp;/gi, ' ')
+      .trim();
+
+  return content;
 }
